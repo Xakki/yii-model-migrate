@@ -46,7 +46,7 @@ use Zend\Code\Reflection;
  *
  * В конфиге commandMap прописать
  * 'modelmigrate' => array('class' => '\extensions\ModelMigration\ModelMigrationCommand', 'connectionID'    => 'db'),
- * !!! запуск, в корне проекта, указать класс -  #php library/core/yiic.php modelmigrate index "app\services\statistics\UserAction"
+ * !!! запуск, в корне проекта, указать класс -  #php yiic.php modelmigrate index "app\services\statistics\UserAction"
  */
 class ModelMigrationCommand extends \CConsoleCommand
 {
@@ -55,7 +55,7 @@ class ModelMigrationCommand extends \CConsoleCommand
     private $_db;
 
     public $connectionID='db';
-    public $templateFile = 'core.cli.views.modelMigration.template';
+    public $templateFile = 'template';
     public $templateSpace = "\n        ";
     public $addComments = false;
 
