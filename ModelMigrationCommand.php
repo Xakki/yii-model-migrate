@@ -7,46 +7,13 @@ use Zend\Code\Reflection;
  * Class ModelMigrationCommand
  * Миграции для моделей
  * @author Xakki yii@xakki.ru
- * @version 0.1
- * @package core\cli\commands
+ * @version 0.2
+ * @package extensions\ModelMigration
  *
- * @property $connectionID      по умолчанию БД
- * @property $templateFile      Шаблон миграции
- * @property $templateSpace     заполняет шаблон пробелами для разделения строк
- * @property $addComments       Добавлять описание атрибутов и таблицы в БД
- *
- * Правила документирования модели
- *
- * !!! далее вместо решетки иметь ввиду собачку!
- * !!! Знак $ допускается вводить один раз, который будет обозначать атрибут модели
- *
- * #connectionId getDbStats     !!! вызов функции если есть
- * #connectionId db_stats       !!! Используемый компонент для подключения к БД
- *
- * !!! Имя таблицы
- * #tablesName tableName  !!! Получить массив таблиц из функции (если есть),  иначе это название таблицы
- * #tablesName test_table,over_table,second_table  !!! Множество таблиц через запятую
- *
- * !!! Атрибуты
- * #property integer    $attribute      строго после описния поля в квадратных скобках задается параметры sql       [int2 NOT NULL]
- * #property string     $attribute2     Тип     [varchar(255)]
- *
- * !!! Если нужно исключить атрибут взаимствованный из extends класса
- * #exclude  $attribute
- *
- * !!! Составной первичный ключ
- * #sqlPrimary     type,date,company_id,mask
- * !!! или можно в атрибутах было прописать так
- * #property id     $id     первичный ключ     [pk]
- *
- * !!! Индексы
- * #sqlIndex    company_id_idx  company_id
- * !!! Уникальный индекс
- * #sqlIndex    company_id_idx  company_id  true
- *
- * В конфиге commandMap прописать
- * 'modelmigrate' => array('class' => '\core\cli\commands\ModelMigrationCommand', 'connectionID'    => 'db'),
- * !!! запуск, в корне проекта, указать класс -  #php library/core/yiic.php modelmigrate index "app\services\statistics\UserAction"
+ * @property CDbConnection      $connectionID      по умолчанию БД
+ * @property string             $templateFile      Шаблон миграции
+ * @property string             $templateSpace     заполняет шаблон пробелами для разделения строк
+ * @property boolean            $addComments       Добавлять описание атрибутов и таблицы в БД
  */
 
 class ModelMigrationCommand extends \CConsoleCommand
