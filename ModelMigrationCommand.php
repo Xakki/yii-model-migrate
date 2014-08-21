@@ -8,7 +8,7 @@ use Zend\Code\Reflection;
  * Миграции для моделей
  * @author Xakki yii@xakki.ru
  * @version 0.1
- * @package extensions\ModelMigration
+ * @package core\cli\commands
  *
  * @property $connectionID      по умолчанию БД
  * @property $templateFile      Шаблон миграции
@@ -45,30 +45,31 @@ use Zend\Code\Reflection;
  * #sqlIndex    company_id_idx  company_id  true
  *
  * В конфиге commandMap прописать
- * 'modelmigrate' => array('class' => '\extensions\ModelMigration\ModelMigrationCommand', 'connectionID'    => 'db'),
- * !!! запуск, в корне проекта, указать класс -  #php yiic.php modelmigrate index "app\services\statistics\UserAction"
+ * 'modelmigrate' => array('class' => '\core\cli\commands\ModelMigrationCommand', 'connectionID'    => 'db'),
+ * !!! запуск, в корне проекта, указать класс -  #php library/core/yiic.php modelmigrate index "app\services\statistics\UserAction"
  */
+
 class ModelMigrationCommand extends \CConsoleCommand
 {
     const VERSION = '0.2';
 
     private $_db;
 
-    public $connectionID='db';
-    public $templateFile = 'template';
+    public $connectionID = 'db';
+    public $templateFile = 'core.cli.views.modelMigration.template';
     public $templateSpace = "\n        ";
     public $addComments = false;
 
-    protected function beforeAction($action,$params)
+    protected function beforeAction($action, $params)
     {
         $yiiVersion = \Yii::getVersion();
-        echo PHP_EOL."Yii Migration for Model Tool v".self::VERSION." (based on Yii v{$yiiVersion})".PHP_EOL;
-        return parent::beforeAction($action,$params);
+        echo PHP_EOL . "Yii Migration for Model Tool v" . self::VERSION . " (based on Yii v{$yiiVersion})" . PHP_EOL;
+        return parent::beforeAction($action, $params);
     }
 
     /**
      * Миграция по модели
-     * php yiic.php modelMigrate index "/namespase/path/to/model"
+     * php library/core/yiic.php modelMigrate index "/namespase/path/to/model"
      * @param $args
      *
      * @return int
@@ -76,7 +77,7 @@ class ModelMigrationCommand extends \CConsoleCommand
     public function actionIndex($args)
     {
         if (!isset($args[0]) || !$args[0]) {
-            echo "Error: Missing the model name.".PHP_EOL;
+            echo "Error: Missing the model name." . PHP_EOL;
             return 1;
         }
         return $this->actionCreate($args[0]);
@@ -84,9 +85,9 @@ class ModelMigrationCommand extends \CConsoleCommand
 
     /**
      * Миграция по фаилу содержащий модель
-     * php yiic.php modelMigrate byfile "file/path"
-     * PhpShtorm : Settings->Remote SSH External Tools->Add [Program -> php | parameters -> yiic.php modelMigrate byfile "$FilePathRelativeToProjectRoot$" ]
-     * где "yiic.php" - укажите ваш путь к запуску
+     * php library/core/yiic.php modelMigrate byfile "file/path"
+     * PhpShtorm : Settings->Remote SSH External Tools->Add [Program -> php | parameters -> library/core/yiic.php modelMigrate byfile "$FilePathRelativeToProjectRoot$" ]
+     * где "library/core/yiic.php" - укажите ваш путь к запуску
      * @param $args
      *
      * @return int
@@ -102,12 +103,12 @@ class ModelMigrationCommand extends \CConsoleCommand
 
         preg_match("/namespace (.+)\;/", $content, $matches);
 
-        if (count($matches)>1 and $matches[1]) {
-            $class .= '\\'.$matches[1].'\\';
+        if (count($matches) > 1 and $matches[1]) {
+            $class .= '\\' . $matches[1] . '\\';
         }
         preg_match("/class (\w+) extends/", $content, $matches);
 
-        if (count($matches)>1 and $matches[1]) {
+        if (count($matches) > 1 and $matches[1]) {
             $class .= $matches[1];
         }
 
@@ -121,57 +122,55 @@ class ModelMigrationCommand extends \CConsoleCommand
      */
     public function actionCreate($className)
     {
-        if(!$className) {
+        if (!$className) {
             $this->usageError('Please provide the name of the model.');
         }
 
         // 1 - find model
         $modelReflection = self::getModelObject($className);
-        if(!$modelReflection) {
+        if (!$modelReflection) {
             return 1;
         }
 
         // 2 - get table dif structure
         $modelSqlInfoDocX = $this->getModelSqlInfoFromDocX($modelReflection, $modelReflection->getName());
         if (is_null($modelSqlInfoDocX)) {
-            $this->usageError('The model "'.$className.'" don`t have SQL info');
+            $this->usageError('The model "' . $className . '" don`t have SQL info');
         }
 
         // 3 - get diff
         $modelSqlDiff = $this->getModelSqlDiff($modelSqlInfoDocX);
         if (!count($modelSqlDiff)) {
-            echo "Ok! The model '{$className}' is good and don't have sql change.".PHP_EOL;
+            echo "Ok! The model '{$className}' is good and don't have sql change." . PHP_EOL;
             return 0;
         }
 
         // 4 - create sql command
         list($queryUp, $queryDown) = $this->getSqlQuery($modelSqlDiff);
 
-        $confirm = 'Create new migration?'.PHP_EOL.
-            '------ UP'.$this->templateSpace.
-            implode($this->templateSpace, $queryUp).PHP_EOL.
-            '------ DOWN'.$this->templateSpace.
-            implode($this->templateSpace, $queryDown).PHP_EOL;
+        $confirm = 'Create new migration?' . PHP_EOL
+            . '------ UP' . $this->templateSpace
+            . implode($this->templateSpace, $queryUp) . PHP_EOL
+            . '------ DOWN' . $this->templateSpace
+            . implode($this->templateSpace, $queryDown) . PHP_EOL;
 
-        if($this->confirm($confirm))
-        {
+        if ($this->confirm($confirm)) {
             // 4 - create migration file
             \Yii::import('core.cli.commands.CMigrateCommand');
             $command = new \CMigrateCommand('migrate', $this->getCommandRunner());
             $command->interactive = false;
             $command->templateFile = $this->getTemplateFile($queryUp, $queryDown);
-            $mname = 'modelMigrate_'.\Yii::app()->format->formatToCamelCase($className);
+            $mname = 'modelMigrate_' . \Yii::app()->format->formatToCamelCase($className);
             $command->run(array('create', $mname));
 
             // выводим сообщение
-            $mname = 'm'.gmdate('ymd_His').'_'.$mname;
-            $file = $command->migrationPath.DIRECTORY_SEPARATOR.$mname.'.php';
+            $mname = 'm' . gmdate('ymd_His') . '_' . $mname;
+            $file = $command->migrationPath . DIRECTORY_SEPARATOR . $mname . '.php';
             // Insert our code in file
-            echo PHP_EOL."New migration model created successfully - {$file}.".PHP_EOL;
+            echo PHP_EOL . "New migration model created successfully - {$file}." . PHP_EOL;
         }
         return 0;
     }
-
 
     /*****************************************************/
 
@@ -183,16 +182,18 @@ class ModelMigrationCommand extends \CConsoleCommand
      */
     private function getTemplateFile($queryUp, $queryDown)
     {
-        $content = file_get_contents(\Yii::getPathOfAlias($this->templateFile).'.tpl');
-        $content=strtr($content, array(
-            '{safeUp}'=>$this->templateSpace.implode($this->templateSpace,$queryUp),
-            '{safeDown}'=>$this->templateSpace.implode($this->templateSpace,$queryDown),
-        ));
+        $content = file_get_contents(\Yii::getPathOfAlias($this->templateFile) . '.tpl');
+        $content = strtr(
+            $content,
+            array(
+                '{safeUp}' => $this->templateSpace . implode($this->templateSpace, $queryUp),
+                '{safeDown}' => $this->templateSpace . implode($this->templateSpace, $queryDown),
+            )
+        );
         $file = tempnam(sys_get_temp_dir(), 'modelMigration.');
         file_put_contents($file, $content);
         return $file;
     }
-
 
     /**
      * Возвращаем обект клсасса или NULL если его нет
@@ -202,7 +203,7 @@ class ModelMigrationCommand extends \CConsoleCommand
     private static function getModelObject($name)
     {
         if (!class_exists($name)) {
-            echo "Error: The model `".$name."` cant find.".PHP_EOL;
+            echo "Error: The model `" . $name . "` cant find." . PHP_EOL;
             return null;
         }
         $reflection = new Reflection\ClassReflection($name);
@@ -258,7 +259,7 @@ class ModelMigrationCommand extends \CConsoleCommand
         foreach ($property as $r) {
             $desc = $r->getDescription();
             $matches = array();
-            if(preg_match('/(.*)\[([^\]\[]*)\]/', $desc, $matches) && isset($matches[2])) {
+            if (preg_match('/(.*)\[([^\]\[]*)\]/', $desc, $matches) && isset($matches[2])) {
                 $key = trim($r->getPropertyName(), '$');
                 $sqlDoc['columns'][$key] = $matches[2];
                 if ($this->addComments) {
@@ -272,13 +273,13 @@ class ModelMigrationCommand extends \CConsoleCommand
             unset($sqlDoc['columns'][trim($r->getContent(), '$')]);
         }
 
-
         $pkey = $docs->getTag('sqlPrimary');
         if ($pkey) {
             $sqlDoc['pkey'] = $pkey->getContent();
         }
 
-        $sql_index = $docs->getTags('sqlIndex');
+        $sql_index = $docs->getTags('sqlIndex'); //
+
         foreach ($sql_index as $r) {
             self::appendDocIndex($sqlDoc['index'], $r);
         }
@@ -297,7 +298,7 @@ class ModelMigrationCommand extends \CConsoleCommand
         $sqlDoc[$index[0]] = array(
             'name' => $index[0],
             'keys' => $index[1],
-            'unique' => (isset($index[3]) && $index[3]=='unique') ? true : false,
+            'unique' => (isset($index[3]) && $index[3] == 'unique') ? true : false,
         );
     }
 
@@ -310,28 +311,26 @@ class ModelMigrationCommand extends \CConsoleCommand
      */
     protected function appendDocTableNames(&$sqlDoc, $docs, $parentClass)
     {
-        $tablesNameTag =  $docs->getTag('tablesName');
+        $tablesNameTag = $docs->getTag('tablesName');
         if ($tablesNameTag) {
             $content = $tablesNameTag->getContent();
             if (method_exists($parentClass, $content)) {
-                $sqlDoc['tables'] =  (array) call_user_func(array($parentClass, $content));
-            }
-            else {
-                $sqlDoc['tables'] =  preg_split('/,/', $content, -1, PREG_SPLIT_NO_EMPTY);
+                $sqlDoc['tables'] = (array)call_user_func(array($parentClass, $content));
+            } else {
+                $sqlDoc['tables'] = preg_split('/,/', $content, -1, PREG_SPLIT_NO_EMPTY);
             }
         }
-        if (!$sqlDoc['tables']) {
-            $this->usageError('TableName does not exist');
-        }
+//        if (!$sqlDoc['tables']) {
+//            $this->usageError('TableName does not exist');
+//        }
 
         // Если у модели друга БД
-        $connectionIdTag =  $docs->getTag('connectionId');
+        $connectionIdTag = $docs->getTag('connectionId');
         if ($connectionIdTag) {
             $content = $connectionIdTag->getContent();
             if (method_exists($parentClass, $content)) {
                 $sqlDoc['connectionId'] = call_user_func(array($parentClass, $content));
-            }
-            else {
+            } else {
                 $sqlDoc['connectionId'] = $content;
             }
         }
@@ -353,7 +352,7 @@ class ModelMigrationCommand extends \CConsoleCommand
 
         if (!count($modelSqlInfoDocX['tables'])) {
             if (count($modelSqlInfoDocX['columns'])) {
-                echo 'Warning - не задана таблица'.PHP_EOL;
+                echo 'Warning - не задана таблица' . PHP_EOL;
             }
             return $diff;
         }
@@ -368,8 +367,7 @@ class ModelMigrationCommand extends \CConsoleCommand
                 $data['new'] = true; // создание табл
                 $data['columnsRemove'] = array();
                 $diff[] = $data;
-            }
-            else {
+            } else {
                 $diffDell = array_diff_key($table->columns, $modelSqlInfoDocX['columns']);
                 $diffAdd = array_diff_key($modelSqlInfoDocX['columns'], $table->columns);
 
@@ -394,7 +392,7 @@ class ModelMigrationCommand extends \CConsoleCommand
      */
     private function queryTableInfo($tableName)
     {
-        $db=$this->getDbConnection();
+        $db = $this->getDbConnection();
         return $db->schema->getTable($tableName);
     }
 
@@ -417,7 +415,7 @@ class ModelMigrationCommand extends \CConsoleCommand
     {
         $up = $down = array();
         if ($this->connectionID) {
-            $up[] = $down[] = '$this->setDbConnection(\Yii::app()->'.$this->connectionID.');';
+            $up[] = $down[] = '$this->setDbConnection(\Yii::app()->' . $this->connectionID . ');';
         }
 
         foreach ($sqlInfo as $item) {
@@ -426,61 +424,59 @@ class ModelMigrationCommand extends \CConsoleCommand
             if ($item['new']) {
                 $query = $this->templateSpace;
                 if ($this->addComments) {
-                    $query .= '/* '.$item['tableComment'].'*/'.$this->templateSpace;
+                    $query .= '/* ' . $item['tableComment'] . '*/' . $this->templateSpace;
                 }
-                $query .= '$this->createTable(\''.$table.'\', array('.$this->templateSpace;
-                foreach ($item['columns'] as $k=>$r) {
-                    $query .= '    \''.$k.'\' => \''.$r.'\',';
+                $query .= '$this->createTable(\'' . $table . '\', array(' . $this->templateSpace;
+                foreach ($item['columns'] as $k => $r) {
+                    $query .= '    \'' . $k . '\' => \'' . $r . '\',';
                     if ($this->addComments) {
-                        $query .= '    /* '.$item['columnsComment'][$k].'*/';
+                        $query .= '    /* ' . $item['columnsComment'][$k] . '*/';
                     }
                     $query .= $this->templateSpace;
                 }
                 $query .= '));';
                 $up[] = $query;
-            }
-            else {
-                foreach ($item['columns'] as $k=>$r) {
+            } else {
+                foreach ($item['columns'] as $k => $r) {
                     $query = '';
                     if ($this->addComments) {
-                        $query .= '/*'.$item['columnsComment'][$k].'*/'.$this->templateSpace;
+                        $query .= '/*' . $item['columnsComment'][$k] . '*/' . $this->templateSpace;
                     }
-                    $query .= '$this->addColumn(\''.$table.'\', \''.$k.'\', \''.$r.'\');'.$this->templateSpace;
+                    $query .= '$this->addColumn(\'' . $table . '\', \'' . $k . '\', \'' . $r . '\');' . $this->templateSpace;
                     $up[] = $query;
                 }
 
-                foreach ($item['columnsRemove'] as $k=>$r) {
-                    $down[] = '$this->addColumn(\''.$table.'\', \''.$k.'\', \''.self::getColumnProperty($r).'\');'.$this->templateSpace;
+                foreach ($item['columnsRemove'] as $k => $r) {
+                    $down[] = '$this->addColumn(\'' . $table . '\', \'' . $k . '\', \'' . self::getColumnProperty($r) . '\');' . $this->templateSpace;
                 }
             }
 
             // primary key
             if (isset($item['pkey']) and $item['pkey']) {
-                $name = $table.'_pkey';
+                $name = $table . '_pkey';
                 $columns = $item['pkey'];
-                $up[] = '$this->addPrimaryKey(\''.$name.'\',\''.$table.'\',\''.$columns.'\');';
+                $up[] = '$this->addPrimaryKey(\'' . $name . '\',\'' . $table . '\',\'' . $columns . '\');';
                 // $down[] = '$this->dropPrimaryKey(\''.$name.'\',\''.$table.'\');'; // dropPrimaryKey - ошибка в функции
             }
 
             // INDEX
             if (isset($item['index'])) {
-                foreach($item['index'] as $index) {
-                    $up[] = '$this->createIndex(\''.$table.'_'.$index['name'].'\', \''.$table.'\', \''.$index['keys'].'\', '.($index['unique'] ? 'true' : 'false').');';
-                    $down[] = '$this->dropIndex(\''.$table.'_'.$index['name'].'\', \''.$table.'\');';
+                foreach ($item['index'] as $index) {
+                    $up[] = '$this->createIndex(\'' . $table . '_' . $index['name'] . '\', \'' . $table . '\', \'' . $index['keys'] . '\', ' . ($index['unique'] ? 'true' : 'false') . ');';
+                    $down[] = '$this->dropIndex(\'' . $table . '_' . $index['name'] . '\', \'' . $table . '\');';
                 }
             }
 
             // DOWN TABLE
             if ($item['new']) {
-                $down[] = $this->templateSpace.'$this->dropTable(\''.$table.'\');';
-            }
-            else {
-                foreach ($item['columns'] as $k=>$r) {
-                    $down[] = '$this->dropColumn(\''.$table.'\', \''.$k.'\');'.$this->templateSpace;
+                $down[] = $this->templateSpace . '$this->dropTable(\'' . $table . '\');';
+            } else {
+                foreach ($item['columns'] as $k => $r) {
+                    $down[] = '$this->dropColumn(\'' . $table . '\', \'' . $k . '\');' . $this->templateSpace;
                 }
 
-                foreach ($item['columnsRemove'] as $k=>$r) {
-                    $up[] = '$this->dropColumn(\''.$table.'\', \''.$k.'\');'.$this->templateSpace;
+                foreach ($item['columnsRemove'] as $k => $r) {
+                    $up[] = '$this->dropColumn(\'' . $table . '\', \'' . $k . '\');' . $this->templateSpace;
                 }
             }
         }
@@ -494,12 +490,14 @@ class ModelMigrationCommand extends \CConsoleCommand
      */
     protected function getDbConnection()
     {
-        if($this->_db!==null)
+        if ($this->_db !== null) {
             return $this->_db;
-        elseif(($this->_db = \Yii::app()->getComponent($this->connectionID)) instanceof \CDbConnection)
+        }
+        elseif (($this->_db = \Yii::app()->getComponent($this->connectionID)) instanceof \CDbConnection) {
             return $this->_db;
+        }
 
-        echo "Error: CMigrationCommand.connectionID '{$this->connectionID}' is invalid. Please make sure it refers to the ID of a CDbConnection application component.".PHP_EOL;
+        echo "Error: CMigrationCommand.connectionID '{$this->connectionID}' is invalid. Please make sure it refers to the ID of a CDbConnection application component." . PHP_EOL;
         exit(1);
     }
 
@@ -527,10 +525,9 @@ class ModelMigrationCommand extends \CConsoleCommand
 //            [_e:CComponent:private] =>
 //            [_m:CComponent:private] =>
         $columns = array();
-        foreach($table['columns'] as $column) {
+        foreach ($table['columns'] as $column) {
             $columns[] = '"type" int2 NOT NULL';
         }
         return $columns;
     }
-
 }
