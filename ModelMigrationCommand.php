@@ -1,5 +1,5 @@
 <?php
-namespace extensions\ModelMigration;
+namespace yiiModelMigrate;
 
 use Zend\Code\Reflection;
 
@@ -23,7 +23,7 @@ class ModelMigrationCommand extends \CConsoleCommand
     private $_db;
 
     public $connectionID = 'db';
-    public $templateFile = 'core.cli.views.modelMigration.template';
+    public $templateFile = 'template';
     public $templateSpace = "\n        ";
     public $addComments = false;
 
@@ -36,7 +36,7 @@ class ModelMigrationCommand extends \CConsoleCommand
 
     /**
      * Миграция по модели
-     * php library/core/yiic.php modelMigrate index "/namespase/path/to/model"
+     * php yiic.php modelMigrate index "/namespase/path/to/model"
      * @param $args
      *
      * @return int
@@ -52,9 +52,9 @@ class ModelMigrationCommand extends \CConsoleCommand
 
     /**
      * Миграция по фаилу содержащий модель
-     * php library/core/yiic.php modelMigrate byfile "file/path"
-     * PhpShtorm : Settings->Remote SSH External Tools->Add [Program -> php | parameters -> library/core/yiic.php modelMigrate byfile "$FilePathRelativeToProjectRoot$" ]
-     * где "library/core/yiic.php" - укажите ваш путь к запуску
+     * php yiic.php modelMigrate byfile "file/path"
+     * PhpShtorm : Settings->Remote SSH External Tools->Add [Program -> php | parameters -> yiic.php modelMigrate byfile "$FilePathRelativeToProjectRoot$" ]
+     * где "yiic.php" - укажите ваш путь к запуску
      * @param $args
      *
      * @return int
