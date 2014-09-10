@@ -333,17 +333,20 @@ class ModelMigrationCommand extends \CConsoleCommand
                 $data['table'] = $tableName;
                 $data['new'] = true; // создание табл
                 $data['columnsRemove'] = array();
+                $data['indexRemove'] = array();
                 $diff[] = $data;
             } else {
-                $diffDell = array_diff_key($table->columns, $modelSqlInfoDocX['columns']);
-                $diffAdd = array_diff_key($modelSqlInfoDocX['columns'], $table->columns);
+                list($diffAdd, $diffRemove) = $this->getColumnsDef($table, $modelSqlInfoDocX);
+                list($indexAdd, $indexRemove) = $this->getIndexDef($tableName, $modelSqlInfoDocX);
 
-                if (count($diffDell) || count($diffAdd)) {
+                if (count($diffRemove) || count($diffAdd) || count($indexAdd) || count($indexRemove)) {
                     $diff[] = array(
                         'table' => $tableName,
                         'new' => false,
-                        'columnsRemove' => $diffDell,
                         'columns' => $diffAdd,
+                        'columnsRemove' => $diffRemove,
+                        'index' => $indexAdd,
+                        'indexRemove' => $indexRemove,
                     );
                 }
             }
@@ -352,6 +355,56 @@ class ModelMigrationCommand extends \CConsoleCommand
         return $diff;
     }
 
+    /**
+     * Различия в колонках
+     * @param $table
+     * @param $modelSqlInfoDocX
+     *
+     * @return array
+     */
+    private function getColumnsDef($table, $modelSqlInfoDocX)
+    {
+        $diffAdd = array_diff_key($modelSqlInfoDocX['columns'], $table->columns);
+        $diffRemove = array_diff_key($table->columns, $modelSqlInfoDocX['columns']);
+        return [$diffAdd, $diffRemove];
+    }
+
+    /**
+     * Различия в индексе
+     * @param $table
+     * @param $modelSqlInfoDocX
+     *
+     * @return array
+     */
+    private function getIndexDef($tableName, $modelSqlInfoDocX)
+    {
+        //$db = $this->getDbConnection();
+        //$db->schema->getTable($tableName);
+        $sql = '
+SELECT
+        n.nspname               AS "schema",
+        c.relname               AS "index"
+FROM
+        pg_catalog.pg_class AS c
+LEFT JOIN
+        pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+WHERE
+        c.relkind = \'i\'
+        AND
+        n.nspname NOT IN (\'pg_catalog\', \'pg_toast\')
+ORDER BY
+        c.relname ASC';
+        $params = [];
+        $data = $this->getDbConnection()->createCommand($sql)->queryAll(true, $params) ;
+
+        print_r($data);
+        exit();
+
+        $indexAdd = $modelSqlInfoDocX['index'];
+        $indexRemove = [];
+        // TODO - получить список имеющихся индексов
+        return [$indexAdd, $indexRemove];
+    }
     /**
      * инфа о таблице
      * @param $tableName
@@ -459,8 +512,7 @@ class ModelMigrationCommand extends \CConsoleCommand
     {
         if ($this->_db !== null) {
             return $this->_db;
-        }
-        elseif (($this->_db = \Yii::app()->getComponent($this->connectionID)) instanceof \CDbConnection) {
+        } elseif (($this->_db = \Yii::app()->getComponent($this->connectionID)) instanceof \CDbConnection) {
             return $this->_db;
         }
 
