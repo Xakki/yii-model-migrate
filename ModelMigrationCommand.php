@@ -23,7 +23,7 @@ class ModelMigrationCommand extends \CConsoleCommand
     private $_db;
 
     public $connectionID = 'db';
-    public $templateFile = 'template';
+    public $templateFile = 'template.tpl';
     public $templateSpace = "\n        ";
     public $addComments = false;
 
@@ -149,7 +149,7 @@ class ModelMigrationCommand extends \CConsoleCommand
      */
     private function getTemplateFile($queryUp, $queryDown)
     {
-        $content = file_get_contents(\Yii::getPathOfAlias($this->templateFile) . '.tpl');
+        $content = file_get_contents($this->templateFile);
         $content = strtr(
             $content,
             array(
@@ -378,31 +378,26 @@ class ModelMigrationCommand extends \CConsoleCommand
      */
     private function getIndexDef($tableName, $modelSqlInfoDocX)
     {
-        //$db = $this->getDbConnection();
-        //$db->schema->getTable($tableName);
-        $sql = '
-SELECT
-        n.nspname               AS "schema",
-        c.relname               AS "index"
-FROM
-        pg_catalog.pg_class AS c
-LEFT JOIN
-        pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
-WHERE
-        c.relkind = \'i\'
-        AND
-        n.nspname NOT IN (\'pg_catalog\', \'pg_toast\')
-ORDER BY
-        c.relname ASC';
-        $params = [];
-        $data = $this->getDbConnection()->createCommand($sql)->queryAll(true, $params) ;
-
-        print_r($data);
-        exit();
-
         $indexAdd = $modelSqlInfoDocX['index'];
         $indexRemove = [];
-        // TODO - получить список имеющихся индексов
+        $data = $this->getPostgresIndex($tableName);
+        foreach($data as $item) {
+            if (strpos($item['index_name'], $tableName.'_')===0) {
+                $index = substr($item['index_name'], (strlen($tableName)+1));
+
+                if (isset($indexAdd[$index])) {
+                    unset($indexAdd[$index]);
+                }
+                elseif (!isset($indexAdd[$index]) && $index != 'pkey') {
+                    $indexRemove[$index] = [
+                        'name' => $index,
+                        'keys' => $item['column_name'],
+                        'unique' => false
+                    ];
+                }
+            }
+        }
+
         return [$indexAdd, $indexRemove];
     }
     /**
@@ -486,6 +481,13 @@ ORDER BY
                     $down[] = '$this->dropIndex(\'' . $table . '_' . $index['name'] . '\', \'' . $table . '\');';
                 }
             }
+            // INDEX
+            if (isset($item['indexRemove'])) {
+                foreach ($item['indexRemove'] as $index) {
+                    $down[] = '$this->createIndex(\'' . $table . '_' . $index['name'] . '\', \'' . $table . '\', \'' . $index['keys'] . '\', ' . ($index['unique'] ? 'true' : 'false') . ');';
+                    $up[] = '$this->dropIndex(\'' . $table . '_' . $index['name'] . '\', \'' . $table . '\');';
+                }
+            }
 
             // DOWN TABLE
             if ($item['new']) {
@@ -548,5 +550,30 @@ ORDER BY
             $columns[] = '"type" int2 NOT NULL';
         }
         return $columns;
+    }
+
+    private function getPostgresIndex($tableName) {
+        $sql = '
+select
+    t.relname as table_name,
+    i.relname as index_name,
+    a.attname as column_name
+from
+    pg_class t,
+    pg_class i,
+    pg_index ix,
+    pg_attribute a
+where
+    t.oid = ix.indrelid
+    and i.oid = ix.indexrelid
+    and a.attrelid = t.oid
+    and a.attnum = ANY(ix.indkey)
+    and t.relkind = \'r\'
+    and t.relname like \''.$tableName.'\'
+order by
+    t.relname,
+    i.relname;';
+        $params = [];
+        return $this->getDbConnection()->createCommand($sql)->queryAll(true, $params);
     }
 }
