@@ -207,7 +207,7 @@ class ModelMigrationCommand extends \CConsoleCommand
             }
         }
 
-        if ($this->addComments) {
+        if ($this->addComments && $docs) {
             $sqlDoc['tableComment'] = $docs->getShortDescription();
             if (!$sqlDoc['tableComment']) {
                 $sqlDoc['tableComment'] = $docs->getLongDescription();
@@ -278,6 +278,7 @@ class ModelMigrationCommand extends \CConsoleCommand
      */
     protected function appendDocTableNames(&$sqlDoc, $docs, $parentClass)
     {
+        if (!$docs) return;
         $tablesNameTag = $docs->getTag('tablesName');
         if ($tablesNameTag) {
             $content = $tablesNameTag->getContent();
