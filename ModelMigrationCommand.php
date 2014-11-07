@@ -262,11 +262,13 @@ class ModelMigrationCommand extends \CConsoleCommand
     {
         $index = $sqlIndex->getContent();
         $index = preg_split('/[\t\s]+/', $index);
-        $sqlDoc[$index[0]] = array(
-            'name' => $index[0],
-            'keys' => $index[1],
-            'unique' => (isset($index[3]) && $index[3] == 'unique') ? true : false,
-        );
+        if ($index[0]) {
+            $sqlDoc[$index[0]] = array(
+                'name' => $index[0],
+                'keys' => (isset($index[1]) ? $index[1] : $index[0]),
+                'unique' => (isset($index[3]) && $index[3] == 'unique') ? true : false,
+            );
+        }
     }
 
     /**
